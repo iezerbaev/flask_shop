@@ -1,6 +1,6 @@
 from shop import app
 from flask import render_template, request, redirect, url_for, flash
-from shop.models import Post, Product, db, User
+from shop.models import Post, Product, db, User, Comment, Buy
 from PIL import Image
 from flask_login import login_user, logout_user, current_user, login_required
 from shop.forms import RegistrationForm, PostForm
@@ -50,7 +50,7 @@ def login():
         user = User.query.filter_by(email=request.form.get('email')).first()
         if user and user.password == request.form.get('password'):
             login_user(user)
-        return redirect(url_for('index'))
+            return redirect(url_for('index'))
     return render_template('login.html')
 
 
@@ -69,7 +69,8 @@ def product_detail(product_id):
 @app.route('/blog')
 def blog():
     page = request.args.get('page', 1, type=int)
-    posts = Post.query.order_by(Post.date_posted.desc()).paginate(page=page, per_page=1)
+    posts = Post.query.order_by(
+        Post.date_posted.desc()).paginate(page=page, per_page=1)
     return render_template('blog.html', posts=posts)
 
 
@@ -92,7 +93,32 @@ def new_post():
     return render_template('new_post.html', form=form)
 
 
-@app.route('/blog/<int:post_id>')
+@app.route('/blog/<int:post_id>', methods=['GET', 'POST'])
 def post_detail(post_id):
     post = Post.query.get(post_id)
-    return render_template('post_detail.html', post=post)
+    comments = Comment.query.order_by(Comment.date_posted.desc()).all()
+    if request.method == 'POST':
+        comment = Comment(name=request.form.get('name'), subject=request.form.get(
+            'subject'), email=request.form.get('email'), message=request.form.get('message'), post=post)
+        db.session.add(comment)
+        db.session.commit()
+        flash('Комментарий добавлен!', 'success')
+    return render_template('post_detail.html', post=post, comments=comments)
+
+
+@app.route('/products/<int:product_id>/buy', methods=['GET', 'POST'])
+def buy(product_id):
+    product = Product.query.get(product_id)
+    if request.method == "POST":
+        f = request.form
+        b = Buy(name=f.get('name'), adress=f.get('adress'), email=f.get(
+            'email'), product=product)
+        db.session.add(b)
+        db.session.commit()
+    return render_template('buy.html')
+
+
+@app.route('/buys')
+def buys():
+    buys = Buy.query.all()
+    return render_template('buys.html', buys=buys)
